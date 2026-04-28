@@ -25,7 +25,7 @@
     *{box-sizing:border-box}
     html{scroll-behavior:smooth}
     body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.45}
-    button,input{font:inherit}
+    button,input,select{font:inherit}
     .app{max-width:1560px;margin:auto;padding:18px}
     .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
     .title-wrap{display:flex;gap:12px;align-items:flex-start}
@@ -67,6 +67,11 @@
     .tab{padding:0;background:transparent;border:none;font-weight:800;color:var(--muted);cursor:pointer;position:relative}
     .tab.active{color:var(--primary)}
     .tab.active::after{content:'';position:absolute;left:0;bottom:-12px;width:100%;height:3px;background:var(--primary);border-radius:999px}
+    
+    /* ESTILOS BARRA DE FILTROS */
+    .filter-bar{display:flex;gap:10px;padding:12px 18px;background:var(--panel-2);border-bottom:1px solid var(--line);flex-wrap:wrap;}
+    .filter-select{padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:0.85rem;font-weight:600;}
+    
     .table-box{overflow:auto;max-height:70vh}
     .table-box table{width:100%;border-collapse:separate;border-spacing:0;font-size:.91rem}
     .table-box th,.table-box td{padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
@@ -86,14 +91,14 @@
     .totals-head,.totals-cell{background:var(--totals) !important}
     .totals-start{border-left:3px solid var(--line) !important}
     
-    /* NUEVOS COLORES PARA LAS ALERTAS F e I */
     .alerta-f{background:var(--falta-bg) !important;color:var(--falta-text) !important;font-weight:800}
     .alerta-i{background:var(--warn-bg) !important;color:var(--warn-text) !important;font-weight:800}
     .alert-cell{background:var(--warn-bg) !important;color:var(--warn-text) !important;font-weight:800}
     
     .dropzone{border:1.5px dashed var(--line);background:var(--panel-2);border-radius:14px;padding:12px}
     .dropzone.drag{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%, var(--panel-2))}
-    .meta-tag{display:inline-block;padding:2px 6px;border-radius:6px;background:var(--line);font-size:0.75rem;color:var(--muted);margin-left:6px;font-weight:600;}
+    .meta-tag{display:inline-block;padding:2px 6px;border-radius:6px;background:var(--line);font-size:0.7rem;color:var(--muted);margin-left:4px;font-weight:600;}
+    
     @media (max-width:1320px){
       .top-filters-grid{grid-template-columns:1fr 1fr 1fr}
       .header-actions{justify-content:flex-start}
@@ -167,7 +172,7 @@
 
   <section class="stats">
     <div class="stat"><div class="k">Registros válidos</div><div class="v" id="statRows">0</div></div>
-    <div class="stat"><div class="k">Colaboradores</div><div class="v" id="statWorkers">0</div></div>
+    <div class="stat"><div class="k">Colaboradores filtrados</div><div class="v" id="statWorkers">0</div></div>
     <div class="stat"><div class="k">Días procesados</div><div class="v" id="statDays">0</div></div>
     <div class="stat"><div class="k">Filas resumen</div><div class="v" id="statSummary">0</div></div>
   </section>
@@ -181,6 +186,15 @@
         <button class="tab" data-tab="anomalias">Anomalías / Faltas</button>
       </div>
     </div>
+    
+    <!-- BARRA DE FILTROS DINÁMICA -->
+    <div class="filter-bar" id="filterBar" style="display:none;">
+      <select id="filterEmpresa" class="filter-select"><option value="ALL">Todas las Empresas</option></select>
+      <select id="filterCategoria" class="filter-select"><option value="ALL">Obreros y Empleados</option></select>
+      <select id="filterContrato" class="filter-select"><option value="ALL">Planilla y RxH</option></select>
+      <select id="filterTurno" class="filter-select"><option value="ALL">Todos los Turnos</option></select>
+    </div>
+
     <div id="tab-resumen" class="table-box"></div>
     <div id="tab-tareo" class="table-box hidden"></div>
     <div id="tab-bd" class="table-box hidden"></div>
@@ -209,19 +223,18 @@
     'T830a17': { 
       inH: 8, inM: 30, 
       outH: 17, outM: 0, 
-      horasJornal: 7.5, // 8.5 horas totales - 1 hora refri = 7.5
+      horasJornal: 7.5, 
       diasLaborables: [1, 2, 3, 4, 5, 6] // Lunes a Sábado
     }
   };
 
   function getHorario(turnoKey) {
-    // Si el turno no existe en el diccionario, aplicamos el clásico 7 a 16 por defecto
     return HORARIOS[turnoKey] || HORARIOS['T7a16'];
   }
 
   const SETTINGS = {
     dedupeMinutes: 3,
-    weekdayLunchHours: 1, // Descuento de 60 mins de refrigerio si cruza el turno
+    weekdayLunchHours: 1, 
     topeHsDiario: 6
   };
 
@@ -255,6 +268,11 @@
     statWorkers: $('#statWorkers'),
     statDays: $('#statDays'),
     statSummary: $('#statSummary'),
+    filterBar: $('#filterBar'),
+    filterEmpresa: $('#filterEmpresa'),
+    filterCategoria: $('#filterCategoria'),
+    filterContrato: $('#filterContrato'),
+    filterTurno: $('#filterTurno'),
     resumen: $('#tab-resumen'),
     tareo: $('#tab-tareo'),
     bd: $('#tab-bd'),
@@ -359,7 +377,6 @@
       if (!found.nombre && ['nombre','colaborador','trabajador','empleado','personal','name','nombre completo'].includes(k)) found.nombre = h;
       if (!found.hora && ['hora','fecha y hora','fecha hora','datetime','marcacion','marcacion completa','fecha','time'].includes(k)) found.hora = h;
       if (!found.estado && ['estado de asistencia','estado','tipo','movimiento','attendance status'].includes(k)) found.estado = h;
-      // NUEVO: Detectar departamento
       if (!found.departamento && ['departamento','department','área','area','seccion'].includes(k)) found.departamento = h;
     });
     return found;
@@ -380,13 +397,12 @@
       const idPersona = map.idPersona ? String(row[map.idPersona] ?? '').trim() : '';
       const tipo = getEventType(estado);
 
-      // PARSEO INTELIGENTE DE DEPARTAMENTO: EMPRESA/CATEGORIA/CONTRATO/TURNO
       const depBruto = map.departamento ? String(row[map.departamento] ?? '').trim() : '';
       const depParts = depBruto.split('/');
       const empresa = depParts[0] || 'TSM';
       const categoria = depParts[1] || 'GENERAL';
       const contrato = depParts[2] || 'PLANILLA';
-      const turno = depParts[3] || 'T7a16'; // Fallback por defecto si no lo escribieron bien
+      const turno = depParts[3] || 'T7a16'; 
 
       if (!dt || !nombre || !estado) return null;
       return { 
@@ -407,14 +423,14 @@
         catalog.set(key, { 
           workerKey: key, idPersona: r.idPersona, nombre: r.nombre, 
           empresa: r.empresa, categoria: r.categoria, contrato: r.contrato, turno: r.turno,
-          grupo: `${r.empresa} - ${r.contrato}`, // Para pintar colores en la UI
+          grupo: `${r.empresa} - ${r.contrato}`, 
           order: r.fila 
         });
       }
     });
-    // Ordenamos primero por empresa, luego por contrato, luego orden de aparición
     return [...catalog.values()].sort((a, b) => {
       if (a.empresa !== b.empresa) return a.empresa.localeCompare(b.empresa);
+      if (a.categoria !== b.categoria) return a.categoria.localeCompare(b.categoria);
       if (a.contrato !== b.contrato) return a.contrato.localeCompare(b.contrato);
       return a.order - b.order;
     });
@@ -446,7 +462,6 @@
         if (!openEntry) openEntry = r;
         else anomalies.push(`Entrada repetida ${fmtTime(r.hora)}`);
       }
-
       if (r.tipo === 'OUT') {
         if (!openEntry) {
           anomalies.push(`Salida sin entrada ${fmtTime(r.hora)}`);
@@ -456,12 +471,7 @@
           anomalies.push(`Salida antes de entrada ${fmtTime(r.hora)}`);
           continue;
         }
-
-        sessions.push({
-          entrada: openEntry.hora,
-          salida: r.hora,
-          horas: hoursBetween(openEntry.hora, r.hora)
-        });
+        sessions.push({ entrada: openEntry.hora, salida: r.hora, horas: hoursBetween(openEntry.hora, r.hora) });
         openEntry = null;
       }
     }
@@ -469,32 +479,22 @@
     if (openEntry) anomalies.push(`Entrada sin salida ${fmtTime(openEntry.hora)}`);
 
     const totalBruto = sessions.reduce((acc, s) => acc + s.horas, 0);
-    // Ya no descontamos aquí el almuerzo genérico, se descontará según el horario específico luego
     const totalNeto = totalBruto; 
 
     return {
-      rawCount: records.length,
-      cleanedCount: cleaned.length,
-      sessions,
-      anomalies,
+      rawCount: records.length, cleanedCount: cleaned.length, sessions, anomalies,
       primeraEntrada: sessions[0]?.entrada || cleaned.find(x => x.tipo === 'IN')?.hora || null,
       ultimaSalida: sessions[sessions.length - 1]?.salida || [...cleaned].reverse().find(x => x.tipo === 'OUT')?.hora || null,
-      totalBruto: sessions.length ? totalBruto : null,
-      totalNeto: sessions.length ? totalNeto : null
+      totalBruto: sessions.length ? totalBruto : null, totalNeto: sessions.length ? totalNeto : null
     };
   }
 
-  // --- LÓGICA CORE DE HORAS EXTRAS Y TARDANZAS ---
   function calcularHorasConTolerancia(minutosTotales) {
     const horasEnteras = Math.floor(minutosTotales / 60);
     const minutosSueltos = minutosTotales % 60;
-    
     let hsToleradas = horasEnteras;
-    if (minutosSueltos >= 51) {
-      hsToleradas += 1.0;
-    } else if (minutosSueltos >= 45) {
-      hsToleradas += 0.5;
-    }
+    if (minutosSueltos >= 51) { hsToleradas += 1.0; } 
+    else if (minutosSueltos >= 45) { hsToleradas += 0.5; }
     return hsToleradas;
   }
 
@@ -506,68 +506,49 @@
     const horario = getHorario(turnoKey);
     const isDomingoFeriado = isSunday(fecha) || isHoliday(fecha);
 
-    // LÓGICA DE DOMINGOS Y FERIADOS
     if (isDomingoFeriado) {
       const netMinutes = Math.round(analysis.totalNeto * 60);
       let hsDomingo = calcularHorasConTolerancia(netMinutes);
       return { brutas: analysis.totalBruto, netas: analysis.totalNeto, decimal: analysis.totalNeto, jornal: 0, hs: 0, dominical: hsDomingo };
     }
 
-    // LÓGICA DE DÍAS NORMALES: SEPARAMOS LA JORNADA USANDO EL DICCIONARIO
-    const horaEntradaOficial = new Date(fecha);
-    horaEntradaOficial.setHours(horario.inH, horario.inM, 0, 0);
-    
-    const horaSalidaOficial = new Date(fecha);
-    horaSalidaOficial.setHours(horario.outH, horario.outM, 0, 0);
+    const horaEntradaOficial = new Date(fecha); horaEntradaOficial.setHours(horario.inH, horario.inM, 0, 0);
+    const horaSalidaOficial = new Date(fecha); horaSalidaOficial.setHours(horario.outH, horario.outM, 0, 0);
 
-    let minInWindow = 0; // Tiempo trabajado DENTRO del horario oficial
-    let minOutWindow = 0; // Tiempo trabajado DESPUÉS del horario oficial
+    let minInWindow = 0; 
+    let minOutWindow = 0; 
 
     analysis.sessions.forEach(s => {
-      // Bloque del Jornal normal
       let inStart = Math.max(s.entrada.getTime(), horaEntradaOficial.getTime());
       let inEnd = Math.min(s.salida.getTime(), horaSalidaOficial.getTime());
       if (inEnd > inStart) minInWindow += (inEnd - inStart) / 60000;
 
-      // Bloque de Horas Extras
       let outStart = Math.max(s.entrada.getTime(), horaSalidaOficial.getTime());
       let outEnd = s.salida.getTime();
       if (outEnd > outStart) minOutWindow += (outEnd - outStart) / 60000;
     });
 
-    // Descontar la hora de almuerzo de la ventana principal si trabajó más de 4 horas
     if (minInWindow >= 240) {
       minInWindow -= 60;
       if (minInWindow < 0) minInWindow = 0;
     }
 
-    // CÁLCULO DE JORNAL (Con tolerancia adaptable)
     const minutosObjetivoJornal = horario.horasJornal * 60; 
     let jornalFinal = 0;
     
-    // Si la persona completó su objetivo restándole hasta 15 minutos (ej. llegó 15 mins tarde max)
     if (minInWindow >= minutosObjetivoJornal - 15) {
       jornalFinal = horario.horasJornal;
     } else {
-      // Si llegó más tarde de la tolerancia, se trunca a la media hora inferior
       jornalFinal = roundDownHalf(minInWindow / 60);
     }
 
-    // CÁLCULO DE HORAS EXTRAS APLICANDO TOLERANCIA
     let hsFinal = 0;
     if (minOutWindow > 0) {
       hsFinal = calcularHorasConTolerancia(minOutWindow);
       if (hsFinal > SETTINGS.topeHsDiario) hsFinal = SETTINGS.topeHsDiario;
     }
 
-    return { 
-      brutas: analysis.totalBruto, 
-      netas: analysis.totalNeto, // Mantenemos bruto para registro
-      decimal: analysis.totalNeto, 
-      jornal: jornalFinal, 
-      hs: hsFinal, 
-      dominical: 0 
-    };
+    return { brutas: analysis.totalBruto, netas: analysis.totalNeto, decimal: analysis.totalNeto, jornal: jornalFinal, hs: hsFinal, dominical: 0 };
   }
 
   function buildSummary(cleanRows, startDate, endDate) {
@@ -598,18 +579,12 @@
       let alerta = '';
       const sinMarcas = analysis.rawCount === 0;
       const marcaIncompleta = analysis.rawCount > 0 && analysis.sessions.length === 0;
-      
       const horario = getHorario(g.turno);
       const isLaborable = horario.diasLaborables.includes(g.fecha.getDay());
 
-      // Solo ponemos Falta (F) si es un día laborable para ese turno específico y no es feriado
-      if (sinMarcas && isLaborable && !isHoliday(g.fecha)) {
-        alerta = 'F'; 
-      } else if (marcaIncompleta) {
-        alerta = 'I'; 
-      } else if (analysis.anomalies.length) {
-        alerta = 'REV'; 
-      }
+      if (sinMarcas && isLaborable && !isHoliday(g.fecha)) { alerta = 'F'; } 
+      else if (marcaIncompleta) { alerta = 'I'; } 
+      else if (analysis.anomalies.length) { alerta = 'REV'; }
 
       return {
         workerKey: g.workerKey, idPersona: g.idPersona, nombre: g.nombre, fecha: g.fecha, 
@@ -631,10 +606,7 @@
 
   function buildTareo(summaryRows, workers, startDate, endDate) {
     const dates = [];
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      dates.push(new Date(d));
-    }
-
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) { dates.push(new Date(d)); }
     const idx = new Map(summaryRows.map(r => [`${r.workerKey}__${fmtDate(r.fecha)}`, r]));
 
     const rows = workers.map(w => {
@@ -650,26 +622,57 @@
         const horario = getHorario(w.turno);
         const isLaborable = horario.diasLaborables.includes(d.getDay());
         
-        // Si no hay registro, evaluamos si merecía una 'F'
         const sinMarcaDiaLaborable = !rec && isLaborable && !feriado;
-        
         let alerta = rec?.alerta || (sinMarcaDiaLaborable ? 'F' : '');
-        
         const jornal = rec?.jornal ?? 0;
         const hs = rec?.hs ?? 0;
         const dominical = rec?.dominical ?? 0;
 
         out.dias[fmtDate(d)] = { jornal, hs, dominical, feriado, alerta, detalle: rec?.detalle || '' };
-
-        out.hNormal += jornal;
-        out.hExtras += hs;
-        out.dominical += dominical;
+        out.hNormal += jornal; out.hExtras += hs; out.dominical += dominical;
       });
-
       return out;
     });
-
     return { dates, rows };
+  }
+
+  // --- LÓGICA DE FILTRADO EN VIVO ---
+  function getFilteredData() {
+    const emp = els.filterEmpresa.value;
+    const cat = els.filterCategoria.value;
+    const con = els.filterContrato.value;
+    const tur = els.filterTurno.value;
+
+    const fWorkers = state.workers.filter(w => 
+      (emp === 'ALL' || w.empresa === emp) &&
+      (cat === 'ALL' || w.categoria === cat) &&
+      (con === 'ALL' || w.contrato === con) &&
+      (tur === 'ALL' || w.turno === tur)
+    );
+    
+    const validKeys = new Set(fWorkers.map(w => w.workerKey));
+
+    return {
+      summaryRows: state.summaryRows.filter(r => validKeys.has(r.workerKey)),
+      cleanRows: state.cleanRows.filter(r => validKeys.has(r.workerKey)),
+      anomalyRows: state.anomalyRows.filter(r => validKeys.has(r.workerKey)),
+      tareoRows: state.tareo.rows.filter(r => validKeys.has(r.workerKey)),
+      workers: fWorkers
+    };
+  }
+
+  function populateFilters() {
+    const empresas = [...new Set(state.workers.map(w => w.empresa))].sort();
+    const categorias = [...new Set(state.workers.map(w => w.categoria))].sort();
+    const contratos = [...new Set(state.workers.map(w => w.contrato))].sort();
+    const turnos = [...new Set(state.workers.map(w => w.turno))].sort();
+
+    els.filterEmpresa.innerHTML = `<option value="ALL">Todas las Empresas</option>` + empresas.map(v => `<option value="${v}">${v}</option>`).join('');
+    els.filterCategoria.innerHTML = `<option value="ALL">Obreros y Empleados</option>` + categorias.map(v => `<option value="${v}">${v}</option>`).join('');
+    els.filterContrato.innerHTML = `<option value="ALL">Planilla y RxH</option>` + contratos.map(v => `<option value="${v}">${v}</option>`).join('');
+    els.filterTurno.innerHTML = `<option value="ALL">Todos los Turnos</option>` + turnos.map(v => `<option value="${v}">${v}</option>`).join('');
+    
+    els.filterBar.style.display = 'flex';
   }
 
   function handleRowsLoaded(rows) {
@@ -699,16 +702,13 @@
         r.map((v, i) => {
           const value = v == null ? '' : v;
           const isNum = typeof value === 'number';
-          
           let className = [ i === 0 ? 'name-col' : '', isNum ? 'num' : '' ];
           
           if (i === nameColIndex) {
-            // Pintamos según si dice PLANILLA o RXH en su contrato
             const groupString = String(r[options.grupoIndex] ?? '').toUpperCase();
             className.push(groupString.includes('PLANILLA') ? 'planilla-name' : 'rrhh-name');
           }
           
-          // Renderizar los tags visuales si es la columna 4 (Empresa/Turno)
           if (options.renderTags && i === options.tagIndex && value !== '') {
              return `<td class="${className.join(' ').trim()}">${value}</td>`;
           }
@@ -721,45 +721,48 @@
   }
 
   function renderAll() {
+    const fd = getFilteredData();
+
+    els.statWorkers.textContent = fd.workers.length;
+    els.statSummary.textContent = fd.summaryRows.length;
+
     renderTable(els.resumen,
       ['Nombre','ID','Fecha','Día','Asignación','Primera entrada','Última salida','Jornal','H.S.','Alerta','Detalle'],
-      state.summaryRows.slice(0, 2000).map(r => [
+      fd.summaryRows.slice(0, 2000).map(r => [
         r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha),
-        `<span class="meta-tag">${r.empresa}</span><span class="meta-tag">${r.contrato}</span><span class="meta-tag">${r.turno}</span>`,
+        `<span class="meta-tag">${r.empresa}</span><span class="meta-tag">${r.categoria}</span><span class="meta-tag">${r.contrato}</span><span class="meta-tag">${r.turno}</span>`,
         r.primeraEntrada ? fmtTime(r.primeraEntrada) : '', r.ultimaSalida ? fmtTime(r.ultimaSalida) : '',
         displayNum(r.jornal), displayNum(r.hs), r.alerta, r.detalle
       ]),
-      { nameColIndex: 0, grupoIndex: 12, renderTags: true, tagIndex: 4 } // Pasamos grupoIndex dummy para colorear
+      { nameColIndex: 0, grupoIndex: 12, renderTags: true, tagIndex: 4 }
     );
 
     renderTable(els.bd,
       ['Nombre','ID','Fecha','Día','Hora','Estado','Tipo','Ruta IVMS'],
-      state.cleanRows.slice(0, 3000).map(r => [
-        r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), fmtTime(r.hora), r.estado, r.tipo || '', r.turno // Mostramos turno base
+      fd.cleanRows.slice(0, 3000).map(r => [
+        r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), fmtTime(r.hora), r.estado, r.tipo || '', `${r.empresa}/${r.categoria}/${r.contrato}/${r.turno}`
       ])
     );
 
     renderTable(els.anomalias,
-      ['Nombre','ID','Fecha','Día','Turno Asignado','Alerta','Detalle','Jornal','H.S.'],
-      state.anomalyRows.slice(0, 3000).map(r => [
-        r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), r.turno, r.alerta, r.detalle, displayNum(r.jornal), displayNum(r.hs)
+      ['Nombre','ID','Fecha','Día','Asignación','Alerta','Detalle','Jornal','H.S.'],
+      fd.anomalyRows.slice(0, 3000).map(r => [
+        r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), `${r.categoria} ${r.turno}`, r.alerta, r.detalle, displayNum(r.jornal), displayNum(r.hs)
       ])
     );
 
-    const { dates, rows } = state.tareo;
     let html = '<table><thead><tr>';
     html += '<th class="name-col" rowspan="2">Colaboradores</th>';
-    html += dates.map(d => `<th colspan="2" class="day-head day-start">${escapeHtml(fmtDate(d))}<span class="day-name">${escapeHtml(weekdayName(d))}</span></th>`).join('');
+    html += state.tareo.dates.map(d => `<th colspan="2" class="day-head day-start">${escapeHtml(fmtDate(d))}<span class="day-name">${escapeHtml(weekdayName(d))}</span></th>`).join('');
     html += '<th rowspan="2" class="totals-head totals-start">H.NORMAL</th><th rowspan="2" class="totals-head">H.EXTRAS</th><th rowspan="2" class="totals-head">DOMINICAL</th></tr><tr>';
-    html += dates.map((d, idx) => `<th class="sub-day-start ${idx === 0 ? 'day-start' : ''}">JORNAL</th><th>H.S.</th>`).join('');
+    html += state.tareo.dates.map((d, idx) => `<th class="sub-day-start ${idx === 0 ? 'day-start' : ''}">JORNAL</th><th>H.S.</th>`).join('');
     html += '</tr></thead><tbody>';
 
-    rows.forEach(r => {
-      // Color según contrato
+    fd.tareoRows.forEach(r => {
       const nameClass = r.contrato.toUpperCase().includes('PLANILLA') ? 'planilla-name' : 'rrhh-name';
-      html += `<tr><td class="name-col ${nameClass}"><div>${escapeHtml(r.nombre)}</div><div style="font-size:0.7rem;color:var(--muted);font-weight:600;">${r.empresa} / ${r.turno}</div></td>`;
+      html += `<tr><td class="name-col ${nameClass}"><div>${escapeHtml(r.nombre)}</div><div style="font-size:0.7rem;color:var(--muted);font-weight:600;">${r.empresa} / ${r.categoria} / ${r.turno}</div></td>`;
       
-      dates.forEach((d, idx) => {
+      state.tareo.dates.forEach((d, idx) => {
         const k = fmtDate(d);
         const v = r.dias[k] || { jornal: 0, hs: 0, feriado: false, alerta: '', detalle: '' };
         
@@ -787,14 +790,12 @@
     els.tareo.innerHTML = html;
   }
 
-  function updateStats(sourceRows, workers) {
+  function updateStats(sourceRows) {
     els.statRows.textContent = sourceRows.length;
-    els.statWorkers.textContent = workers.length;
     els.statDays.textContent = state.tareo.dates.length;
-    els.statSummary.textContent = state.summaryRows.length;
   }
 
-  function buildTareoSheetData() {
+  function buildTareoSheetData(filteredTareoRows) {
     const row1 = ['Colaboradores'];
     const row2 = [''];
     state.tareo.dates.forEach(d => { row1.push(`${fmtDate(d)} ${weekdayName(d)}`, ''); row2.push('JORNAL', 'H.S.'); });
@@ -802,13 +803,11 @@
     row2.push('', '', '');
 
     const data = [row1, row2];
-    state.tareo.rows.forEach(r => {
-      // Concatenamos nombre + metadata para que se vea claro en Excel
-      const row = [`${r.nombre} [${r.empresa}-${r.contrato}]`];
+    filteredTareoRows.forEach(r => {
+      const row = [`${r.nombre} [${r.empresa}-${r.categoria}-${r.contrato}]`];
       state.tareo.dates.forEach(d => {
         const k = fmtDate(d);
         const cell = r.dias[k] || { jornal: 0, hs: 0, alerta: '' };
-        
         if (cell.alerta === 'F') { row.push('F', ''); }
         else if (cell.alerta === 'I') { row.push('I', ''); }
         else {
@@ -823,8 +822,9 @@
   }
 
   function workbookOut() {
+    const fd = getFilteredData(); // SOLO EXPORTAMOS LO FILTRADO
     const wb = XLSX.utils.book_new();
-    const tareoData = buildTareoSheetData();
+    const tareoData = buildTareoSheetData(fd.tareoRows);
     const wsTareo = XLSX.utils.aoa_to_sheet(tareoData);
     wsTareo['!merges'] = [];
 
@@ -844,13 +844,13 @@
       }
     }
 
-    wsTareo['!cols'] = [{ wch: 40 }, ...Array(tareoData[0].length - 1).fill({ wch: 10 })];
+    wsTareo['!cols'] = [{ wch: 45 }, ...Array(tareoData[0].length - 1).fill({ wch: 10 })];
     XLSX.utils.book_append_sheet(wb, wsTareo, 'TAREO');
 
     const resumenData = [
-      ['Empresa','Contrato','Turno','Nombre','ID','Fecha','Día','Primera entrada','Última salida','Jornal','H.S.','Alerta','Detalle'],
-      ...state.summaryRows.map(r => [
-        r.empresa, r.contrato, r.turno, r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha),
+      ['Empresa','Categoría','Contrato','Turno','Nombre','ID','Fecha','Día','Primera entrada','Última salida','Jornal','H.S.','Alerta','Detalle'],
+      ...fd.summaryRows.map(r => [
+        r.empresa, r.categoria, r.contrato, r.turno, r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha),
         r.primeraEntrada ? fmtTime(r.primeraEntrada) : '', r.ultimaSalida ? fmtTime(r.ultimaSalida) : '',
         r.jornal ?? '', r.hs ?? '', r.alerta, r.detalle
       ])
@@ -858,9 +858,9 @@
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumenData), 'RESUMEN');
 
     const anomaliasData = [
-      ['Empresa','Turno','Nombre','ID','Fecha','Día','Alerta','Detalle','Jornal','H.S.'],
-      ...state.anomalyRows.map(r => [
-        r.empresa, r.turno, r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), r.alerta, r.detalle, r.jornal ?? '', r.hs ?? ''
+      ['Empresa','Categoría','Turno','Nombre','ID','Fecha','Día','Alerta','Detalle','Jornal','H.S.'],
+      ...fd.anomalyRows.map(r => [
+        r.empresa, r.categoria, r.turno, r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), r.alerta, r.detalle, r.jornal ?? '', r.hs ?? ''
       ])
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(anomaliasData), 'ANOMALIAS');
@@ -882,10 +882,11 @@
       state.workers = workers;
       state.tareo = buildTareo(summaryRows, workers, startDate, endDate);
 
+      populateFilters();
       renderAll();
-      updateStats(effectiveRows, workers);
+      updateStats(effectiveRows);
 
-      setStatus(`Procesado correctamente · ${summaryRows.length} filas resumen`, 'ok');
+      setStatus(`Procesado correctamente · Usa los filtros para revisar`, 'ok');
       els.downloadXlsxBtn.disabled = !summaryRows.length;
       els.downloadCsvBtn.disabled = !summaryRows.length;
     } catch (err) {
@@ -901,7 +902,7 @@
     reader.onload = e => {
       try {
         state.workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true, raw: true });
-        state.fileName = (file.name || 'tareo').replace(/\.(xlsx|xls)$/i, '') + '_tareo_tsm.xlsx';
+        state.fileName = (file.name || 'tareo').replace(/\.(xlsx|xls)$/i, '') + '_filtrado.xlsx';
         const name = state.workbook.SheetNames[0];
         const ws = state.workbook.Sheets[name];
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true, cellDates: true });
@@ -917,12 +918,14 @@
 
   function loadSample() {
     const rows = [
-      { 'ID de persona': '00000027', Nombre: 'Lamper Torres, Jose', Hora: '07/04/2026 07:16', 'Estado de asistencia': 'Registro de entrada', Departamento: 'SAC/OBRERO/PLANILLA/T7a16' },
-      { 'ID de persona': '00000027', Nombre: 'Lamper Torres, Jose', Hora: '07/04/2026 18:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'SAC/OBRERO/PLANILLA/T7a16' },
-      { 'ID de persona': '00000028', Nombre: 'Garcia Muñoz, Ana', Hora: '07/04/2026 08:35', 'Estado de asistencia': 'Registro de entrada', Departamento: 'GROUP/EMPLEADO/RXH/T830a17' },
-      { 'ID de persona': '00000028', Nombre: 'Garcia Muñoz, Ana', Hora: '07/04/2026 18:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'GROUP/EMPLEADO/RXH/T830a17' }
+      { 'ID de persona': '001', Nombre: 'Lamper Torres, Jose', Hora: '06/04/2026 06:50', 'Estado de asistencia': 'Registro de entrada', Departamento: 'SAC/OBRERO/PLANILLA/T7a16' },
+      { 'ID de persona': '001', Nombre: 'Lamper Torres, Jose', Hora: '06/04/2026 18:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'SAC/OBRERO/PLANILLA/T7a16' },
+      { 'ID de persona': '002', Nombre: 'Garcia Muñoz, Ana', Hora: '06/04/2026 07:55', 'Estado de asistencia': 'Registro de entrada', Departamento: 'GROUP/EMPLEADO/PLANILLA/T8a18' },
+      { 'ID de persona': '002', Nombre: 'Garcia Muñoz, Ana', Hora: '06/04/2026 18:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'GROUP/EMPLEADO/PLANILLA/T8a18' },
+      { 'ID de persona': '003', Nombre: 'Mendoza, Luis', Hora: '06/04/2026 08:25', 'Estado de asistencia': 'Registro de entrada', Departamento: 'GROUP/EMPLEADO/RXH/T830a17' },
+      { 'ID de persona': '003', Nombre: 'Mendoza, Luis', Hora: '06/04/2026 17:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'GROUP/EMPLEADO/RXH/T830a17' }
     ];
-    state.fileName = 'tareo_tsm.xlsx';
+    state.fileName = 'tareo_tsm_test.xlsx';
     setFileName('Ejemplo Multi-Empresa cargado');
     handleRowsLoaded(rows);
     setStatus('Ejemplo cargado', 'ok');
@@ -934,7 +937,8 @@
   }
 
   function downloadCsv() {
-    const blob = new Blob([XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet(buildTareoSheetData()))], { type: 'text/csv;charset=utf-8;' });
+    const fd = getFilteredData();
+    const blob = new Blob([XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet(buildTareoSheetData(fd.tareoRows)))], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'tareo.csv';
@@ -942,10 +946,13 @@
     URL.revokeObjectURL(a.href);
   }
 
-  els.themeBtn.addEventListener('click', () => {
-    document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-  });
+  // --- LISTENERS DE FILTROS ---
+  els.filterEmpresa.addEventListener('change', renderAll);
+  els.filterCategoria.addEventListener('change', renderAll);
+  els.filterContrato.addEventListener('change', renderAll);
+  els.filterTurno.addEventListener('change', renderAll);
 
+  els.themeBtn.addEventListener('click', () => { document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); });
   els.fileInput.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) handleWorkbook(f); });
   els.processBtn.addEventListener('click', processNow);
   els.downloadXlsxBtn.addEventListener('click', downloadXlsx);
