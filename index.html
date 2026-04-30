@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>App Tareo TSM</title>
+  <title>Tareo TSM</title>
   <link rel="icon" type="image/png" href="https://topsolutionmetal.com/wp-content/uploads/2022/07/1.png">
-  <meta name="description" content="Procesa datos de marcador, limpia marcaciones, genera resumen diario y tareo multihomologado.">
+  <meta name="description" content="Filtro automático de marcador para Top Solution Metal.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -86,7 +86,6 @@
     .tab.active{color:var(--primary)}
     .tab.active::after{content:'';position:absolute;left:0;bottom:-17px;width:100%;height:3px;background:var(--primary);border-radius:999px}
     
-    /* ESTILOS PREMIUM PARA LA BARRA DE FILTROS */
     .filter-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;background:var(--head-soft);border-bottom:1px solid var(--line);flex-wrap:wrap;}
     .filter-group{display:flex;gap:10px;flex-wrap:wrap;flex:1;}
     .filter-select{
@@ -113,12 +112,10 @@
     .table-box table{width:100%;border-collapse:separate;border-spacing:0;font-size:.91rem}
     .table-box th,.table-box td{padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
     
-    /* LÓGICA REFORZADA DE ENCABEZADOS FIJOS (STICKY) */
     .table-box thead th{position:sticky;top:0;background:var(--panel);z-index:10;box-shadow:0 1px 0 var(--line)}
     .table-box tbody tr:hover td{background:color-mix(in srgb,var(--primary) 4%, transparent)}
     .table-box .num{text-align:center;font-variant-numeric:tabular-nums}
     
-    /* COLUMNA FIJA IZQUIERDA */
     .table-box td.name-col{position:sticky;left:0;background:var(--panel);z-index:5;box-shadow:1px 0 0 var(--line)}
     .table-box thead tr:first-child .name-col{z-index:13;left:0;box-shadow:1px 1px 0 var(--line)}
     .table-box thead tr:nth-child(2) .name-col{z-index:12;left:0;box-shadow:1px 1px 0 var(--line)}
@@ -174,9 +171,7 @@
       <div class="title">Filtro Automático del Marcador</div>
     </div>
     <button id="themeBtn" class="theme" type="button" title="Cambiar tema visual">
-      <!-- Icono de Sol -->
       <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-      <!-- Icono de Luna -->
       <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
   </div>
@@ -199,7 +194,7 @@
     </div>
 
     <div class="header-actions">
-      <button id="processBtn" class="btn btn-primary" type="button">Procesar Planilla</button>
+      <button id="processBtn" class="btn btn-primary" type="button">Procesar</button>
       <button id="downloadXlsxBtn" class="btn btn-secondary" type="button" disabled>Descargar Excel</button>
       <button id="downloadCsvBtn" class="btn btn-secondary" type="button" disabled>Descargar CSV</button>
     </div>
@@ -230,13 +225,11 @@
       </div>
     </div>
     
-    <!-- BARRA DE FILTROS PREMIUM -->
+    <!-- BARRA DE FILTROS ACTUALIZADA (Solo Empresa y Contrato) -->
     <div class="filter-bar" id="filterBar" style="display:none;">
       <div class="filter-group">
         <select id="filterEmpresa" class="filter-select"><option value="ALL">Todas las Empresas</option></select>
-        <select id="filterCategoria" class="filter-select"><option value="ALL">Obreros y Empleados</option></select>
-        <select id="filterContrato" class="filter-select"><option value="ALL">Planilla y RxH</option></select>
-        <select id="filterTurno" class="filter-select"><option value="ALL">Todos los Turnos</option></select>
+        <select id="filterContrato" class="filter-select"><option value="ALL">Tipo de Contratación</option></select>
       </div>
       <button id="clearFiltersBtn" class="btn btn-ghost" type="button">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -255,37 +248,67 @@
 (() => {
   const $ = s => document.querySelector(s);
 
-  // --- MOTOR DE HORARIOS ESTRATÉGICO ---
-  const HORARIOS = {
-    'T7a16': { 
-      inH: 7, inM: 0, 
-      outH: 16, outM: 0, 
-      horasJornal: 8, 
-      diasLaborables: [1, 2, 3, 4, 5, 6] // Lunes a Sábado
-    },
-    'T8a18': { 
-      inH: 8, inM: 0, 
-      outH: 18, outM: 0, 
-      horasJornal: 8, 
-      diasLaborables: [1, 2, 3, 4, 5] // Lunes a Viernes
-    },
-    'T830a17': { 
-      inH: 8, inM: 30, 
-      outH: 17, outM: 0, 
-      horasJornal: 7.5, 
-      diasLaborables: [1, 2, 3, 4, 5, 6] // Lunes a Sábado
-    }
+  // --- DICCIONARIO MAESTRO (El cerebro del sistema) ---
+  const MAESTRO_PERSONAL = {
+    // --- TSM SAC | PLANILLA ---
+    "lamper torres jose ali": { empresa: "Top Solution Metal SAC", contrato: "Planilla" },
+    "munoz garcia miguel angel": { empresa: "Top Solution Metal SAC", contrato: "Planilla" },
+    "rincon ramirez giovanni jose": { empresa: "Top Solution Metal SAC", contrato: "Planilla" },
+    "rubina reynoso nilton aquiles": { empresa: "Top Solution Metal SAC", contrato: "Planilla" },
+    "saldana alanya carlos alberto": { empresa: "Top Solution Metal SAC", contrato: "Planilla" },
+    "valderrama alva sergio angel": { empresa: "Top Solution Metal SAC", contrato: "Planilla" },
+    "valderrama mozombite gustavo": { empresa: "Top Solution Metal SAC", contrato: "Planilla" },
+    
+    // --- TSM SAC | RECIBOS POR HONORARIOS ---
+    "cabrera carlos david": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "capcha rojas genaro vicente": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "cordova mori adriel": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "cotos alba alex luis": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "culqui aspajo pedro augusto": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "curitima murayari jorge miguel": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "gonzales chavez jesus": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "mendoza chauran luis enrique": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "montes bullon christopher": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "prada del pino jose luis": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "roncal quinto luis alberto": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+    "tamaris angeles jose antonio": { empresa: "Top Solution Metal SAC", contrato: "Recibos por Honorarios" },
+
+    // --- TSM GROUP | PLANILLA ---
+    "andrade riobueno marco antonio": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "bonifacio rodriguez yanfranco": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "galindo cabezas joel serafin": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "garcia cornelio roberto carlos": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "gonzales llumpo cristian esteban": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "lazaro salas jhon javier": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "mejias perez jose alberto": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "pezo fatama tono": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "rivas sotomayor yorman rafael": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "sequeiros prudencio jose luis": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+    "suarez torrelles jehison omar": { empresa: "Top Solution Metal Group", contrato: "Planilla" },
+
+    // --- TSM GROUP | RECIBOS POR HONORARIOS ---
+    "aguilar mesia jose cirilo": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "chahua villa efrain": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "cipiran ramirez abraham moises": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "collazos marquez eliot karl": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "curitima murayari neuber": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "delgado aguinaga anderson eduardo": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "elescano ortiz leandro federico": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "elescano ortiz leonardo antonio": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "flores tuanama geiner": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "lopez quispe karlo francisco": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "pina gordon daniel andres": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "ramirez arismendi manuel oscar": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "urquia guevara orlando": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" },
+    "zuta vilca edinson": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" }
   };
 
-  function getHorario(turnoKey) {
-    return HORARIOS[turnoKey] || HORARIOS['T7a16'];
-  }
-
-  const SETTINGS = {
-    dedupeMinutes: 3,
-    weekdayLunchHours: 1, 
-    topeHsDiario: 6
+  // Turno general para todos los obreros de la lista
+  const HORARIO_GENERAL = { 
+    inH: 7, inM: 0, outH: 16, outM: 0, horasJornal: 8, diasLaborables: [1, 2, 3, 4, 5, 6] 
   };
+
+  const SETTINGS = { dedupeMinutes: 3, weekdayLunchHours: 1, topeHsDiario: 6 };
 
   const state = {
     workbook: null,
@@ -318,9 +341,7 @@
     statSummary: $('#statSummary'),
     filterBar: $('#filterBar'),
     filterEmpresa: $('#filterEmpresa'),
-    filterCategoria: $('#filterCategoria'),
     filterContrato: $('#filterContrato'),
-    filterTurno: $('#filterTurno'),
     clearFiltersBtn: $('#clearFiltersBtn'),
     resumen: $('#tab-resumen'),
     tareo: $('#tab-tareo'),
@@ -333,6 +354,8 @@
 
   const pad = n => String(n).padStart(2, '0');
   const normalize = v => String(v ?? '').trim().toLowerCase();
+  
+  // Limpia tildes y caracteres raros para igualar nombres exactos
   const normalizeSimple = v => normalize(v)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -358,36 +381,15 @@
   }
 
   function escapeHtml(v) {
-    return String(v ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  function isHoliday(d) {
-    return HOLIDAY_OVERRIDES.has(fmtDate(d));
-  }
+  function isHoliday(d) { return HOLIDAY_OVERRIDES.has(fmtDate(d)); }
 
-  function showError(msg) {
-    els.errorBox.textContent = msg;
-    els.errorBox.classList.remove('hidden');
-  }
-
-  function clearError() {
-    els.errorBox.classList.add('hidden');
-    els.errorBox.textContent = '';
-  }
-
-  function setStatus(text, tone = '') {
-    els.statusBadge.className = 'pill ' + tone;
-    els.statusBadge.textContent = text;
-  }
-
-  function setFileName(text) {
-    els.fileName.textContent = text || 'Ningún archivo seleccionado';
-  }
+  function showError(msg) { els.errorBox.textContent = msg; els.errorBox.classList.remove('hidden'); }
+  function clearError() { els.errorBox.classList.add('hidden'); els.errorBox.textContent = ''; }
+  function setStatus(text, tone = '') { els.statusBadge.className = 'pill ' + tone; els.statusBadge.textContent = text; }
+  function setFileName(text) { els.fileName.textContent = text || 'Ningún archivo seleccionado'; }
 
   function getEventType(estado) {
     const k = normalizeSimple(estado);
@@ -404,11 +406,8 @@
     }
     const t = String(value ?? '').trim();
     if (!t) return null;
-
     const isoLike = t.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-    if (isoLike) {
-      return new Date(Number(isoLike[1]), Number(isoLike[2]) - 1, Number(isoLike[3]), Number(isoLike[4] || 0), Number(isoLike[5] || 0), Number(isoLike[6] || 0));
-    }
+    if (isoLike) return new Date(Number(isoLike[1]), Number(isoLike[2]) - 1, Number(isoLike[3]), Number(isoLike[4] || 0), Number(isoLike[5] || 0), Number(isoLike[6] || 0));
     const dmy = t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
     if (dmy) {
       const y = dmy[3].length === 2 ? Number('20' + dmy[3]) : Number(dmy[3]);
@@ -419,14 +418,13 @@
   }
 
   function detectColumns(headers) {
-    const found = { idPersona: '', nombre: '', hora: '', estado: '', departamento: '' };
+    const found = { idPersona: '', nombre: '', hora: '', estado: '' };
     headers.forEach(h => {
       const k = normalizeSimple(h);
       if (!found.idPersona && ['id de persona','id persona','codigo de persona','codigo persona','id trabajador','id empleado','legajo','codigo','id'].includes(k)) found.idPersona = h;
       if (!found.nombre && ['nombre','colaborador','trabajador','empleado','personal','name','nombre completo'].includes(k)) found.nombre = h;
       if (!found.hora && ['hora','fecha y hora','fecha hora','datetime','marcacion','marcacion completa','fecha','time'].includes(k)) found.hora = h;
       if (!found.estado && ['estado de asistencia','estado','tipo','movimiento','attendance status'].includes(k)) found.estado = h;
-      if (!found.departamento && ['departamento','department','área','area','seccion'].includes(k)) found.departamento = h;
     });
     return found;
   }
@@ -437,8 +435,9 @@
 
   function buildRows(rows, map) {
     if (!map.nombre || !map.hora || !map.estado) {
-      throw new Error('No se detectaron bien las columnas clave de Nombre, Hora y Estado. Revisa tu Excel.');
+      throw new Error('No se detectaron bien las columnas clave. Revisa tu Excel.');
     }
+    
     return rows.map((row, i) => {
       const dt = parseExcelDate(row[map.hora]);
       const nombre = String(row[map.nombre] ?? '').trim();
@@ -446,17 +445,19 @@
       const idPersona = map.idPersona ? String(row[map.idPersona] ?? '').trim() : '';
       const tipo = getEventType(estado);
 
-      const depBruto = map.departamento ? String(row[map.departamento] ?? '').trim() : '';
-      const depParts = depBruto.split('/');
-      const empresa = depParts[0] || 'TSM';
-      const categoria = depParts[1] || 'GENERAL';
-      const contrato = depParts[2] || 'PLANILLA';
-      const turno = depParts[3] || 'T7a16'; 
-
       if (!dt || !nombre || !estado) return null;
+
+      // EL CEREBRO: Buscamos si el nombre existe en el diccionario maestro
+      const maestroKey = normalizeSimple(nombre);
+      const infoPersonal = MAESTRO_PERSONAL[maestroKey];
+
+      // Si la persona NO está en nuestra lista de obreros configurada, la ignoramos.
+      if (!infoPersonal) return null; 
+
       return { 
         idPersona, nombre, hora: dt, fecha: dayOnly(dt), estado, tipo, 
-        empresa, categoria, contrato, turno,
+        empresa: infoPersonal.empresa, 
+        contrato: infoPersonal.contrato,
         fila: i + 2 
       };
     })
@@ -471,15 +472,13 @@
       if (!catalog.has(key)) {
         catalog.set(key, { 
           workerKey: key, idPersona: r.idPersona, nombre: r.nombre, 
-          empresa: r.empresa, categoria: r.categoria, contrato: r.contrato, turno: r.turno,
-          grupo: `${r.empresa} - ${r.contrato}`, 
+          empresa: r.empresa, contrato: r.contrato,
           order: r.fila 
         });
       }
     });
     return [...catalog.values()].sort((a, b) => {
       if (a.empresa !== b.empresa) return a.empresa.localeCompare(b.empresa);
-      if (a.categoria !== b.categoria) return a.categoria.localeCompare(b.categoria);
       if (a.contrato !== b.contrato) return a.contrato.localeCompare(b.contrato);
       return a.order - b.order;
     });
@@ -528,13 +527,11 @@
     if (openEntry) anomalies.push(`Entrada sin salida ${fmtTime(openEntry.hora)}`);
 
     const totalBruto = sessions.reduce((acc, s) => acc + s.horas, 0);
-    const totalNeto = totalBruto; 
-
     return {
       rawCount: records.length, cleanedCount: cleaned.length, sessions, anomalies,
       primeraEntrada: sessions[0]?.entrada || cleaned.find(x => x.tipo === 'IN')?.hora || null,
       ultimaSalida: sessions[sessions.length - 1]?.salida || [...cleaned].reverse().find(x => x.tipo === 'OUT')?.hora || null,
-      totalBruto: sessions.length ? totalBruto : null, totalNeto: sessions.length ? totalNeto : null
+      totalBruto: sessions.length ? totalBruto : null, totalNeto: sessions.length ? totalBruto : null
     };
   }
 
@@ -542,17 +539,17 @@
     const horasEnteras = Math.floor(minutosTotales / 60);
     const minutosSueltos = minutosTotales % 60;
     let hsToleradas = horasEnteras;
-    if (minutosSueltos >= 51) { hsToleradas += 1.0; } 
-    else if (minutosSueltos >= 45) { hsToleradas += 0.5; }
+    if (minutosSueltos >= 51) hsToleradas += 1.0; 
+    else if (minutosSueltos >= 45) hsToleradas += 0.5;
     return hsToleradas;
   }
 
-  function calcWorkedHoursFromAnalysis(analysis, fecha, turnoKey) {
+  function calcWorkedHoursFromAnalysis(analysis, fecha) {
     if (!analysis.sessions.length) {
       return { brutas: null, netas: null, decimal: null, jornal: 0, hs: 0, dominical: 0 };
     }
 
-    const horario = getHorario(turnoKey);
+    const horario = HORARIO_GENERAL;
     const isDomingoFeriado = isSunday(fecha) || isHoliday(fecha);
 
     if (isDomingoFeriado) {
@@ -610,7 +607,7 @@
       if (!group.has(key)) {
         group.set(key, { 
           workerKey, idPersona: r.idPersona, nombre: r.nombre, fecha: r.fecha, 
-          empresa: r.empresa, categoria: r.categoria, contrato: r.contrato, turno: r.turno,
+          empresa: r.empresa, contrato: r.contrato,
           records: [], order: r.fila 
         });
       }
@@ -623,13 +620,12 @@
 
     const summaryRows = [...group.values()].map(g => {
       const analysis = analyzeDayMarks(g.records, g.fecha);
-      const calc = calcWorkedHoursFromAnalysis(analysis, g.fecha, g.turno);
+      const calc = calcWorkedHoursFromAnalysis(analysis, g.fecha);
 
       let alerta = '';
       const sinMarcas = analysis.rawCount === 0;
       const marcaIncompleta = analysis.rawCount > 0 && analysis.sessions.length === 0;
-      const horario = getHorario(g.turno);
-      const isLaborable = horario.diasLaborables.includes(g.fecha.getDay());
+      const isLaborable = HORARIO_GENERAL.diasLaborables.includes(g.fecha.getDay());
 
       if (sinMarcas && isLaborable && !isHoliday(g.fecha)) { alerta = 'F'; } 
       else if (marcaIncompleta) { alerta = 'I'; } 
@@ -637,7 +633,7 @@
 
       return {
         workerKey: g.workerKey, idPersona: g.idPersona, nombre: g.nombre, fecha: g.fecha, 
-        empresa: g.empresa, categoria: g.categoria, contrato: g.contrato, turno: g.turno,
+        empresa: g.empresa, contrato: g.contrato,
         primeraEntrada: analysis.primeraEntrada, ultimaSalida: analysis.ultimaSalida,
         horasBrutas: calc.brutas, horasNetas: calc.netas, horasDecimal: calc.decimal,
         jornal: calc.jornal, hs: calc.hs, dominical: calc.dominical,
@@ -661,15 +657,14 @@
     const rows = workers.map(w => {
       const out = { 
         workerKey: w.workerKey, idPersona: w.idPersona, nombre: w.nombre, 
-        empresa: w.empresa, categoria: w.categoria, contrato: w.contrato, turno: w.turno,
-        grupo: w.grupo, dias: {}, hNormal: 0, hExtras: 0, dominical: 0 
+        empresa: w.empresa, contrato: w.contrato,
+        dias: {}, hNormal: 0, hExtras: 0, dominical: 0 
       };
 
       dates.forEach(d => {
         const rec = idx.get(`${w.workerKey}__${fmtDate(d)}`);
         const feriado = isHoliday(d);
-        const horario = getHorario(w.turno);
-        const isLaborable = horario.diasLaborables.includes(d.getDay());
+        const isLaborable = HORARIO_GENERAL.diasLaborables.includes(d.getDay());
         
         const sinMarcaDiaLaborable = !rec && isLaborable && !feriado;
         let alerta = rec?.alerta || (sinMarcaDiaLaborable ? 'F' : '');
@@ -685,18 +680,14 @@
     return { dates, rows };
   }
 
-  // --- LÓGICA DE FILTRADO EN VIVO ---
+  // --- LÓGICA DE FILTRADO (Simplificado) ---
   function getFilteredData() {
     const emp = els.filterEmpresa.value;
-    const cat = els.filterCategoria.value;
     const con = els.filterContrato.value;
-    const tur = els.filterTurno.value;
 
     const fWorkers = state.workers.filter(w => 
       (emp === 'ALL' || w.empresa === emp) &&
-      (cat === 'ALL' || w.categoria === cat) &&
-      (con === 'ALL' || w.contrato === con) &&
-      (tur === 'ALL' || w.turno === tur)
+      (con === 'ALL' || w.contrato === con)
     );
     
     const validKeys = new Set(fWorkers.map(w => w.workerKey));
@@ -712,14 +703,10 @@
 
   function populateFilters() {
     const empresas = [...new Set(state.workers.map(w => w.empresa))].sort();
-    const categorias = [...new Set(state.workers.map(w => w.categoria))].sort();
     const contratos = [...new Set(state.workers.map(w => w.contrato))].sort();
-    const turnos = [...new Set(state.workers.map(w => w.turno))].sort();
 
     els.filterEmpresa.innerHTML = `<option value="ALL">Todas las Empresas</option>` + empresas.map(v => `<option value="${v}">${v}</option>`).join('');
-    els.filterCategoria.innerHTML = `<option value="ALL">Obreros y Empleados</option>` + categorias.map(v => `<option value="${v}">${v}</option>`).join('');
-    els.filterContrato.innerHTML = `<option value="ALL">Planilla y RxH</option>` + contratos.map(v => `<option value="${v}">${v}</option>`).join('');
-    els.filterTurno.innerHTML = `<option value="ALL">Todos los Turnos</option>` + turnos.map(v => `<option value="${v}">${v}</option>`).join('');
+    els.filterContrato.innerHTML = `<option value="ALL">Tipo de Contratación</option>` + contratos.map(v => `<option value="${v}">${v}</option>`).join('');
     
     els.filterBar.style.display = 'flex';
   }
@@ -729,7 +716,7 @@
     state.map = detectColumns(Object.keys(rows[0] || {}));
     state.cleanRows = buildRows(rows, state.map);
 
-    if (!state.cleanRows.length) throw new Error('No se obtuvieron registros válidos en el archivo cargado.');
+    if (!state.cleanRows.length) throw new Error('No se obtuvieron registros válidos. Verifica que los obreros estén en la lista de configuración.');
 
     const ds = state.cleanRows.map(r => stamp(r.fecha));
     els.startDate.value = fmtInput(new Date(Math.min(...ds)));
@@ -752,8 +739,8 @@
           let className = [ i === 0 ? 'name-col' : '', isNum ? 'num' : '' ];
           
           if (i === nameColIndex) {
-            const groupString = String(r[options.grupoIndex] ?? '').toUpperCase();
-            className.push(groupString.includes('PLANILLA') ? 'planilla-name' : 'rrhh-name');
+            const isPlanilla = String(r[options.grupoIndex] ?? '').toUpperCase().includes('PLANILLA');
+            className.push(isPlanilla ? 'planilla-name' : 'rrhh-name');
           }
           
           if (options.renderTags && i === options.tagIndex && value !== '') {
@@ -777,7 +764,7 @@
       ['Nombre','ID','Fecha','Día','Asignación','Primera entrada','Última salida','Jornal','H.S.','Alerta','Detalle'],
       fd.summaryRows.slice(0, 2000).map(r => [
         r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha),
-        `<span class="meta-tag">${r.empresa}</span><span class="meta-tag">${r.categoria}</span><span class="meta-tag">${r.contrato}</span><span class="meta-tag">${r.turno}</span>`,
+        `<span class="meta-tag">${r.empresa}</span><span class="meta-tag">${r.contrato}</span>`,
         r.primeraEntrada ? fmtTime(r.primeraEntrada) : '', r.ultimaSalida ? fmtTime(r.ultimaSalida) : '',
         displayNum(r.jornal), displayNum(r.hs), r.alerta, r.detalle
       ]),
@@ -785,16 +772,16 @@
     );
 
     renderTable(els.bd,
-      ['Nombre','ID','Fecha','Día','Hora','Estado','Tipo','Ruta IVMS'],
+      ['Nombre','ID','Fecha','Día','Hora','Estado','Tipo','Empresa','Contrato'],
       fd.cleanRows.slice(0, 3000).map(r => [
-        r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), fmtTime(r.hora), r.estado, r.tipo || '', `${r.empresa}/${r.categoria}/${r.contrato}/${r.turno}`
+        r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), fmtTime(r.hora), r.estado, r.tipo || '', r.empresa, r.contrato
       ])
     );
 
     renderTable(els.anomalias,
       ['Nombre','ID','Fecha','Día','Asignación','Alerta','Detalle','Jornal','H.S.'],
       fd.anomalyRows.slice(0, 3000).map(r => [
-        r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), `${r.categoria} ${r.turno}`, r.alerta, r.detalle, displayNum(r.jornal), displayNum(r.hs)
+        r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), `${r.empresa} - ${r.contrato}`, r.alerta, r.detalle, displayNum(r.jornal), displayNum(r.hs)
       ])
     );
 
@@ -806,8 +793,9 @@
     html += '</tr></thead><tbody>';
 
     fd.tareoRows.forEach(r => {
-      const nameClass = r.contrato.toUpperCase().includes('PLANILLA') ? 'planilla-name' : 'rrhh-name';
-      html += `<tr><td class="name-col ${nameClass}"><div>${escapeHtml(r.nombre)}</div><div style="font-size:0.7rem;color:var(--muted);font-weight:600;">${r.empresa} / ${r.categoria} / ${r.turno}</div></td>`;
+      const isPlanilla = r.contrato.toUpperCase().includes('PLANILLA');
+      const nameClass = isPlanilla ? 'planilla-name' : 'rrhh-name';
+      html += `<tr><td class="name-col ${nameClass}"><div>${escapeHtml(r.nombre)}</div><div style="font-size:0.7rem;color:var(--muted);font-weight:600;">${r.empresa} / ${r.contrato}</div></td>`;
       
       state.tareo.dates.forEach((d, idx) => {
         const k = fmtDate(d);
@@ -836,7 +824,6 @@
     html += '</tbody></table>';
     els.tareo.innerHTML = html;
 
-    // LÓGICA DE FIJACIÓN DE ENCABEZADOS (STICKY HEADERS PERFECTOS)
     requestAnimationFrame(() => {
       const tareoThead = els.tareo.querySelector('thead tr:first-child');
       if (tareoThead) {
@@ -863,7 +850,7 @@
 
     const data = [row1, row2];
     filteredTareoRows.forEach(r => {
-      const row = [`${r.nombre} [${r.empresa}-${r.categoria}-${r.contrato}]`];
+      const row = [`${r.nombre} [${r.empresa}-${r.contrato}]`];
       state.tareo.dates.forEach(d => {
         const k = fmtDate(d);
         const cell = r.dias[k] || { jornal: 0, hs: 0, alerta: '' };
@@ -907,9 +894,9 @@
     XLSX.utils.book_append_sheet(wb, wsTareo, 'TAREO');
 
     const resumenData = [
-      ['Empresa','Categoría','Contrato','Turno','Nombre','ID','Fecha','Día','Primera entrada','Última salida','Jornal','H.S.','Alerta','Detalle'],
+      ['Empresa','Contrato','Nombre','ID','Fecha','Día','Primera entrada','Última salida','Jornal','H.S.','Alerta','Detalle'],
       ...fd.summaryRows.map(r => [
-        r.empresa, r.categoria, r.contrato, r.turno, r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha),
+        r.empresa, r.contrato, r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha),
         r.primeraEntrada ? fmtTime(r.primeraEntrada) : '', r.ultimaSalida ? fmtTime(r.ultimaSalida) : '',
         r.jornal ?? '', r.hs ?? '', r.alerta, r.detalle
       ])
@@ -917,9 +904,9 @@
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumenData), 'RESUMEN');
 
     const anomaliasData = [
-      ['Empresa','Categoría','Turno','Nombre','ID','Fecha','Día','Alerta','Detalle','Jornal','H.S.'],
+      ['Empresa','Contrato','Nombre','ID','Fecha','Día','Alerta','Detalle','Jornal','H.S.'],
       ...fd.anomalyRows.map(r => [
-        r.empresa, r.categoria, r.turno, r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), r.alerta, r.detalle, r.jornal ?? '', r.hs ?? ''
+        r.empresa, r.contrato, r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), r.alerta, r.detalle, r.jornal ?? '', r.hs ?? ''
       ])
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(anomaliasData), 'ANOMALIAS');
@@ -977,17 +964,19 @@
 
   function loadSample() {
     const rows = [
-      { 'ID de persona': '101', Nombre: 'Lamper Torres, Jose', Hora: '01/04/2026 06:50', 'Estado de asistencia': 'Registro de entrada', Departamento: 'SAC/OBRERO/PLANILLA/T7a16' },
-      { 'ID de persona': '101', Nombre: 'Lamper Torres, Jose', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'SAC/OBRERO/PLANILLA/T7a16' },
-      { 'ID de persona': '102', Nombre: 'Garcia Muñoz, Ana', Hora: '01/04/2026 07:55', 'Estado de asistencia': 'Registro de entrada', Departamento: 'GROUP/EMPLEADO/PLANILLA/T8a18' },
-      { 'ID de persona': '102', Nombre: 'Garcia Muñoz, Ana', Hora: '01/04/2026 18:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'GROUP/EMPLEADO/PLANILLA/T8a18' },
-      { 'ID de persona': '103', Nombre: 'Mendoza, Luis', Hora: '01/04/2026 08:25', 'Estado de asistencia': 'Registro de entrada', Departamento: 'GROUP/EMPLEADO/RXH/T830a17' },
-      { 'ID de persona': '103', Nombre: 'Mendoza, Luis', Hora: '01/04/2026 17:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'GROUP/EMPLEADO/RXH/T830a17' },
-      { 'ID de persona': '104', Nombre: 'Saldaña Alanya, Carlos', Hora: '01/04/2026 07:18', 'Estado de asistencia': 'Registro de entrada', Departamento: 'SAC/OBRERO/RXH/T7a16' },
-      { 'ID de persona': '104', Nombre: 'Saldaña Alanya, Carlos', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'SAC/OBRERO/RXH/T7a16' }
+      { 'ID de persona': '101', Nombre: 'Lamper Torres, Jose Ali', Hora: '01/04/2026 06:50', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Sistemas' },
+      { 'ID de persona': '101', Nombre: 'Lamper Torres, Jose Ali', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'Sistemas' },
+      { 'ID de persona': '102', Nombre: 'Cabrera Carlos, David', Hora: '01/04/2026 07:15', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Logistica' },
+      { 'ID de persona': '102', Nombre: 'Cabrera Carlos, David', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'Logistica' },
+      { 'ID de persona': '103', Nombre: 'Andrade Riobueno Marco Antonio', Hora: '01/04/2026 06:58', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Produccion' },
+      { 'ID de persona': '103', Nombre: 'Andrade Riobueno Marco Antonio', Hora: '01/04/2026 16:45', 'Estado de asistencia': 'Registro de salida', Departamento: 'Produccion' },
+      { 'ID de persona': '104', Nombre: 'Flores Tuanama, Geiner', Hora: '01/04/2026 07:05', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Ventas' },
+      { 'ID de persona': '104', Nombre: 'Flores Tuanama, Geiner', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'Ventas' },
+      // Una persona que no está en el diccionario para probar que la ignora
+      { 'ID de persona': '999', Nombre: 'Persona Desconocida', Hora: '01/04/2026 08:00', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Gerencia' }
     ];
     state.fileName = 'tareo_tsm_test.xlsx';
-    setFileName('Ejemplo Multi-Empresa cargado');
+    setFileName('Ejemplo Cargado');
     handleRowsLoaded(rows);
   }
 
@@ -1008,16 +997,11 @@
 
   // --- LISTENERS DE FILTROS ---
   els.filterEmpresa.addEventListener('change', renderAll);
-  els.filterCategoria.addEventListener('change', renderAll);
   els.filterContrato.addEventListener('change', renderAll);
-  els.filterTurno.addEventListener('change', renderAll);
   
-  // FUNCIONALIDAD: BORRAR FILTROS
   els.clearFiltersBtn.addEventListener('click', () => {
     els.filterEmpresa.value = 'ALL';
-    els.filterCategoria.value = 'ALL';
     els.filterContrato.value = 'ALL';
-    els.filterTurno.value = 'ALL';
     renderAll();
   });
 
