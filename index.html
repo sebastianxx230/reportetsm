@@ -225,7 +225,7 @@
       </div>
     </div>
     
-    <!-- BARRA DE FILTROS ACTUALIZADA (Solo Empresa y Contrato) -->
+    <!-- BARRA DE FILTROS -->
     <div class="filter-bar" id="filterBar" style="display:none;">
       <div class="filter-group">
         <select id="filterEmpresa" class="filter-select"><option value="ALL">Todas las Empresas</option></select>
@@ -303,7 +303,6 @@
     "zuta vilca edinson": { empresa: "Top Solution Metal Group", contrato: "Recibos por Honorarios" }
   };
 
-  // Turno general para todos los obreros de la lista
   const HORARIO_GENERAL = { 
     inH: 7, inM: 0, outH: 16, outM: 0, horasJornal: 8, diasLaborables: [1, 2, 3, 4, 5, 6] 
   };
@@ -355,7 +354,6 @@
   const pad = n => String(n).padStart(2, '0');
   const normalize = v => String(v ?? '').trim().toLowerCase();
   
-  // Limpia tildes y caracteres raros para igualar nombres exactos
   const normalizeSimple = v => normalize(v)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -429,6 +427,41 @@
     return found;
   }
 
+  // --- BUSCADOR DIFUSO DE TRABAJADORES ---
+  function findWorkerInMaestro(excelName) {
+    const normExcel = normalizeSimple(excelName);
+    
+    // 1. Intento de coincidencia exacta
+    if (MAESTRO_PERSONAL[normExcel]) return MAESTRO_PERSONAL[normExcel];
+    
+    // 2. Coincidencia difusa (para cruzar "Jose Lamper Torres" con "lamper torres jose ali")
+    const excelWords = normExcel.split(' ');
+    
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    for (const dictKey in MAESTRO_PERSONAL) {
+      const dictWords = dictKey.split(' ');
+      
+      let matches = 0;
+      for (const w of excelWords) {
+        if (dictWords.includes(w)) matches++;
+      }
+      
+      if (matches > bestScore) {
+        bestScore = matches;
+        bestMatch = MAESTRO_PERSONAL[dictKey];
+      }
+    }
+    
+    // Si cruzan al menos 2 palabras (ej. 1 Nombre y 1 Apellido), consideramos que es la misma persona.
+    if (bestScore >= 2) {
+      return bestMatch;
+    }
+    
+    return null;
+  }
+
   function getWorkerKey(row) {
     return String(row.idPersona || '').trim() || normalizeSimple(row.nombre);
   }
@@ -447,14 +480,15 @@
 
       if (!dt || !nombre || !estado) return null;
 
-      // EL CEREBRO: Buscamos si el nombre existe en el diccionario maestro
-      const maestroKey = normalizeSimple(nombre);
-      const infoPersonal = MAESTRO_PERSONAL[maestroKey];
+      // Usar el buscador inteligente
+      const infoPersonal = findWorkerInMaestro(nombre);
+      if (!infoPersonal) return null; // Si no está en el diccionario, se ignora por completo.
 
-      // Si la persona NO está en nuestra lista de obreros configurada, la ignoramos.
-      if (!infoPersonal) return null; 
+      // Es VITAL guardar el workerKey aquí para que la tabla "BD Limpia" pueda ser filtrada
+      const workerKey = String(idPersona || '').trim() || normalizeSimple(nombre);
 
       return { 
+        workerKey,
         idPersona, nombre, hora: dt, fecha: dayOnly(dt), estado, tipo, 
         empresa: infoPersonal.empresa, 
         contrato: infoPersonal.contrato,
@@ -680,7 +714,6 @@
     return { dates, rows };
   }
 
-  // --- LÓGICA DE FILTRADO (Simplificado) ---
   function getFilteredData() {
     const emp = els.filterEmpresa.value;
     const con = els.filterContrato.value;
@@ -716,7 +749,7 @@
     state.map = detectColumns(Object.keys(rows[0] || {}));
     state.cleanRows = buildRows(rows, state.map);
 
-    if (!state.cleanRows.length) throw new Error('No se obtuvieron registros válidos. Verifica que los obreros estén en la lista de configuración.');
+    if (!state.cleanRows.length) throw new Error('No se encontraron coincidencias entre el Excel y la lista de obreros configurada.');
 
     const ds = state.cleanRows.map(r => stamp(r.fecha));
     els.startDate.value = fmtInput(new Date(Math.min(...ds)));
@@ -739,8 +772,8 @@
           let className = [ i === 0 ? 'name-col' : '', isNum ? 'num' : '' ];
           
           if (i === nameColIndex) {
-            const isPlanilla = String(r[options.grupoIndex] ?? '').toUpperCase().includes('PLANILLA');
-            className.push(isPlanilla ? 'planilla-name' : 'rrhh-name');
+            const contratoStr = String(r[options.contratoStrIndex] ?? '').toUpperCase();
+            className.push(contratoStr.includes('PLANILLA') ? 'planilla-name' : 'rrhh-name');
           }
           
           if (options.renderTags && i === options.tagIndex && value !== '') {
@@ -768,21 +801,23 @@
         r.primeraEntrada ? fmtTime(r.primeraEntrada) : '', r.ultimaSalida ? fmtTime(r.ultimaSalida) : '',
         displayNum(r.jornal), displayNum(r.hs), r.alerta, r.detalle
       ]),
-      { nameColIndex: 0, grupoIndex: 12, renderTags: true, tagIndex: 4 }
+      { nameColIndex: 0, contratoStrIndex: 4, renderTags: true, tagIndex: 4 }
     );
 
     renderTable(els.bd,
       ['Nombre','ID','Fecha','Día','Hora','Estado','Tipo','Empresa','Contrato'],
       fd.cleanRows.slice(0, 3000).map(r => [
         r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), fmtTime(r.hora), r.estado, r.tipo || '', r.empresa, r.contrato
-      ])
+      ]),
+      { nameColIndex: 0, contratoStrIndex: 8 }
     );
 
     renderTable(els.anomalias,
       ['Nombre','ID','Fecha','Día','Asignación','Alerta','Detalle','Jornal','H.S.'],
       fd.anomalyRows.slice(0, 3000).map(r => [
         r.nombre, r.idPersona || '', fmtDate(r.fecha), weekdayName(r.fecha), `${r.empresa} - ${r.contrato}`, r.alerta, r.detalle, displayNum(r.jornal), displayNum(r.hs)
-      ])
+      ]),
+      { nameColIndex: 0, contratoStrIndex: 4 }
     );
 
     let html = '<table><thead><tr>';
@@ -850,7 +885,7 @@
 
     const data = [row1, row2];
     filteredTareoRows.forEach(r => {
-      const row = [`${r.nombre} [${r.empresa}-${r.contrato}]`];
+      const row = [`${r.nombre} [${r.empresa} - ${r.contrato}]`];
       state.tareo.dates.forEach(d => {
         const k = fmtDate(d);
         const cell = r.dias[k] || { jornal: 0, hs: 0, alerta: '' };
@@ -964,16 +999,11 @@
 
   function loadSample() {
     const rows = [
-      { 'ID de persona': '101', Nombre: 'Lamper Torres, Jose Ali', Hora: '01/04/2026 06:50', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Sistemas' },
-      { 'ID de persona': '101', Nombre: 'Lamper Torres, Jose Ali', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'Sistemas' },
-      { 'ID de persona': '102', Nombre: 'Cabrera Carlos, David', Hora: '01/04/2026 07:15', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Logistica' },
-      { 'ID de persona': '102', Nombre: 'Cabrera Carlos, David', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'Logistica' },
-      { 'ID de persona': '103', Nombre: 'Andrade Riobueno Marco Antonio', Hora: '01/04/2026 06:58', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Produccion' },
-      { 'ID de persona': '103', Nombre: 'Andrade Riobueno Marco Antonio', Hora: '01/04/2026 16:45', 'Estado de asistencia': 'Registro de salida', Departamento: 'Produccion' },
-      { 'ID de persona': '104', Nombre: 'Flores Tuanama, Geiner', Hora: '01/04/2026 07:05', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Ventas' },
-      { 'ID de persona': '104', Nombre: 'Flores Tuanama, Geiner', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida', Departamento: 'Ventas' },
-      // Una persona que no está en el diccionario para probar que la ignora
-      { 'ID de persona': '999', Nombre: 'Persona Desconocida', Hora: '01/04/2026 08:00', 'Estado de asistencia': 'Registro de entrada', Departamento: 'Gerencia' }
+      { 'ID de persona': '101', Nombre: 'Jose Lamper Torres', Hora: '01/04/2026 06:50', 'Estado de asistencia': 'Registro de entrada' },
+      { 'ID de persona': '101', Nombre: 'Jose Lamper Torres', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida' },
+      { 'ID de persona': '102', Nombre: 'Abraham Cipiran Ramirez', Hora: '01/04/2026 07:15', 'Estado de asistencia': 'Registro de entrada' },
+      { 'ID de persona': '102', Nombre: 'Abraham Cipiran Ramirez', Hora: '01/04/2026 16:00', 'Estado de asistencia': 'Registro de salida' },
+      { 'ID de persona': '999', Nombre: 'Persona Externa', Hora: '01/04/2026 08:00', 'Estado de asistencia': 'Registro de entrada' }
     ];
     state.fileName = 'tareo_tsm_test.xlsx';
     setFileName('Ejemplo Cargado');
