@@ -61,7 +61,7 @@
 
   const els = {
     fileInput: $('#fileInput'), fileName: $('#fileName'), dropzone: $('#dropzone'),
-    themeBtn: $('#themeBtn'), errorBox: $('#errorBox'), statusBadge: $('#statusBadge'),
+    themeBtn: $('#themeToggleBtn'), errorBox: $('#errorBox'), statusBadge: $('#statusBadge'),
     startDate: $('#startDate'), endDate: $('#endDate'), processBtn: $('#processBtn'),
     downloadXlsxBtn: $('#downloadXlsxBtn'), downloadCsvBtn: $('#downloadCsvBtn'),
     sampleBtn: $('#sampleBtn'), statRows: $('#statRows'), statWorkers: $('#statWorkers'),
@@ -734,7 +734,9 @@
     renderAll();
   });
 
-  els.themeBtn.addEventListener('click', () => { document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); });
+  els.themeBtn.addEventListener('change', e => { 
+    document.documentElement.setAttribute('data-theme', e.target.checked ? 'dark' : 'light'); 
+  });
   els.fileInput.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) handleWorkbook(f); });
   els.processBtn.addEventListener('click', processNow);
   els.downloadXlsxBtn.addEventListener('click', downloadXlsx);
